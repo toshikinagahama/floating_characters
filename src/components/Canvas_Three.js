@@ -6,16 +6,16 @@ import { OrbitControls, useHelper, PointLightHelper } from "@react-three/drei";
 import { useControls } from "leva";
 
 function MyLine({ color, ...props }) {
-  const size = 0.4; //大きさ0.4区切り
+  const size = 20; //大きさ
   const ref = useRef();
   const [points, setPoints] = useState([new THREE.Vector3(0, 0, 0)]);
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [isFinishWrite, setIsFinishWrite] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const refLineGeometries = useRef([]);
   const refLineRegions = useRef([]); //どの領域に属すのか
   const refRegions = useRef({});
 
-  const u = new THREE.Vector3(1, 1, 0).normalize();
   const [angle, setAngle] = useState(0.0);
   const options = useMemo(() => {
     return {
@@ -30,7 +30,7 @@ function MyLine({ color, ...props }) {
       //z方向が鉛直方向
       const keys = Object.keys(refRegions.current);
       for (let i = 0; i < keys.length; i++) {
-        if (keys[i] == "a0b1c0d1") {
+        if (i == selectedIndex) {
           continue;
         }
         const a = refRegions.current[keys[i]].a;
@@ -41,48 +41,44 @@ function MyLine({ color, ...props }) {
         const b_d = refRegions.current[keys[i]].b_d;
         const c_d = refRegions.current[keys[i]].c_d;
         const d_d = refRegions.current[keys[i]].d_d;
-        const a_d2 = refRegions.current[keys[i]].a_d2;
-        const b_d2 = refRegions.current[keys[i]].b_d2;
-        const c_d2 = refRegions.current[keys[i]].c_d2;
-        const d_d2 = refRegions.current[keys[i]].d_d2;
         //各メッシュの点に物理演算
         // ma = -kx - cv + mg + f1(浮力) + f2(外力)
         // 質量
-        const m_a = 1.2;
-        const m_b = 1.2;
-        const m_c = 1;
-        const m_d = 1;
+        const m_a = 3.2;
+        const m_b = 3.2;
+        const m_c = 3;
+        const m_d = 3;
         //減速係数
         const c_all = 1; //減速係数
         //バネ係数
-        const k_all = 50; //バネ係数
+        const k_all = 100; //バネ係数
         //浮力
         const f1_a = new THREE.Vector3(0.0, 0.0, 0);
         const f1_b = new THREE.Vector3(0.0, 0.0, 0);
-        const f1_c = new THREE.Vector3(0.0, 0.0, 22);
-        const f1_d = new THREE.Vector3(0.0, 0.0, 22);
+        const f1_c = new THREE.Vector3(0.0, 0.0, 100);
+        const f1_d = new THREE.Vector3(0.0, 0.0, 100);
         //外力
         const f2_a = new THREE.Vector3(
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0,
-          (Math.random() - 0.5) * 0.1,
+          (Math.random() - 0.5) * 200,
+          (Math.random() - 0.5) * 200,
+          (Math.random() - 0.5) * 30,
         );
         const f2_b = new THREE.Vector3(
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0,
-          (Math.random() - 0.5) * 0.1,
+          (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 30,
         );
         const f2_c = new THREE.Vector3(
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0,
-          (Math.random() - 0.5) * 0.1,
+          (Math.random() - 0.5) * 50,
+          (Math.random() - 0.5) * 50,
+          (Math.random() - 0.5) * 30,
         );
         const f2_d = new THREE.Vector3(
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0,
-          (Math.random() - 0.5) * 0.1,
+          (Math.random() - 0.5) * 70,
+          (Math.random() - 0.5) * 70,
+          (Math.random() - 0.5) * 30,
         );
-        const gra = new THREE.Vector3(0, 0, -9.8);
+        const gra = new THREE.Vector3(0, 0, -14.0);
         //aにかかる力, ab, adの張力
         const l_ab = b
           .clone()
@@ -181,6 +177,26 @@ function MyLine({ color, ...props }) {
         refRegions.current[keys[i]].d.add(
           refRegions.current[keys[i]].d_d.clone().multiplyScalar(dt),
         );
+        if (refRegions.current[keys[i]].a.z < 0) {
+          refRegions.current[keys[i]].a.z = 0;
+          refRegions.current[keys[i]].a_d.z = 0;
+          refRegions.current[keys[i]].a_d2.z = 0;
+        }
+        if (refRegions.current[keys[i]].b.z < 0) {
+          refRegions.current[keys[i]].b.z = 0;
+          refRegions.current[keys[i]].b_d.z = 0;
+          refRegions.current[keys[i]].b_d2.z = 0;
+        }
+        if (refRegions.current[keys[i]].c.z < 0) {
+          refRegions.current[keys[i]].c.z = 0;
+          refRegions.current[keys[i]].c_d.z = 0;
+          refRegions.current[keys[i]].c_d2.z = 0;
+        }
+        if (refRegions.current[keys[i]].d.z < 0) {
+          refRegions.current[keys[i]].d.z = 0;
+          refRegions.current[keys[i]].d_d.z = 0;
+          refRegions.current[keys[i]].d_d2.z = 0;
+        }
       }
       for (let i = 0; i < refLineGeometries.current.length; i++) {
         const positions =
@@ -267,7 +283,18 @@ function MyLine({ color, ...props }) {
       //  u.z * Math.sin(angle / 2),
       //  Math.cos(angle / 2),
       //);
-      state.camera.position.set(0, 2 * Math.sin(-angle), 2 * Math.cos(-angle));
+      state.camera.position.set(
+        0,
+        100 * Math.sin(-angle),
+        100 * Math.cos(-angle),
+      );
+      state.camera.lookAt(new THREE.Vector3(0, 0, 0));
+    } else {
+      state.camera.position.set(
+        0,
+        100 * Math.sin(-angle),
+        100 * Math.cos(-angle),
+      );
       state.camera.lookAt(new THREE.Vector3(0, 0, 0));
     }
   });
@@ -275,13 +302,17 @@ function MyLine({ color, ...props }) {
     <group ref={ref} position={[0, 0, 0]}>
       <spotLight
         color="white"
-        intensity={30}
-        position={[0, 0, 4.2]}
+        intensity={5}
+        position={[0, 0, 100]}
+        shadow-mapSize-width={512}
+        shadow-mapSize-height={512}
+        decay={0.0}
+        penumbra={0.0}
         castShadow
       />
       <mesh
         position={[0, 0, -0.01]}
-        scale={[100, 100, 1]}
+        scale={[200, 200, 1]}
         castShadow
         receiveShadow
         onPointerDown={(e) => {
@@ -329,21 +360,25 @@ function MyLine({ color, ...props }) {
         }}
       >
         <planeGeometry />
-        <meshStandardMaterial color="#fb0b00" side={DoubleSide} />
+        <meshStandardMaterial color="#faebd7" side={DoubleSide} />
       </mesh>
       <mesh
-        position={[-0.7, 1.3, 0.2]}
-        scale={[0.3, 0.1, 0.1]}
+        position={[-40, 70, 0]}
+        scale={[15, 5, 1]}
         onPointerDown={() => {
           refLineGeometries.current = [];
+          refLineRegions.current = [];
+          refRegions.current = [];
+          setAngle(0.0);
+          setIsFinishWrite(false);
         }}
       >
         <planeGeometry />
-        <meshBasicMaterial color="green" side={DoubleSide} />
+        <meshBasicMaterial color="black" side={DoubleSide} />
       </mesh>
       <mesh
-        position={[0.7, 1.3, 0.2]}
-        scale={[0.3, 0.1, 0.1]}
+        position={[40, 70, 0]}
+        scale={[15, 5, 1]}
         onPointerDown={() => {
           //console.log(refLineGeometries);
           //あらかじめ領域マップを定義
@@ -436,6 +471,10 @@ function MyLine({ color, ...props }) {
               });
             }
           }
+          const keys = Object.keys(refRegions.current);
+          const tmpIndex = Math.floor(Math.random() * keys.length);
+          console.log(tmpIndex);
+          setSelectedIndex(tmpIndex);
           setIsFinishWrite(!isFinishWrite);
         }}
       >
@@ -447,7 +486,7 @@ function MyLine({ color, ...props }) {
           <line geometry={g} castShadow key={index}>
             <lineBasicMaterial
               attach="material"
-              color={"#ffffff"}
+              color={"#000000"}
               linewidth={1}
               linecap={"round"}
               linejoin={"round"}
@@ -470,7 +509,7 @@ export default function Canvas_Three(props) {
     <Canvas
       ref={refCanvas}
       shadows
-      camera={{ position: [0, 0, 2] }}
+      camera={{ position: [0, 0, 100] }}
       gl={{
         alpha: false,
         antialias: true,
@@ -480,13 +519,11 @@ export default function Canvas_Three(props) {
     >
       <color attach="background" args={["white"]} />
       <axesHelper />
-      {/*
       <gridHelper
-        scale={0.4}
+        scale={20}
         rotation-x={-Math.PI / 2}
-        args={[100, 100, "red", "#4C4C4C"]}
+        args={[100, 100, "#c5c5c5", "#c5c5c5"]}
       />
-      */}
       <OrbitControls
         enableZoom={true}
         enablePan={true}

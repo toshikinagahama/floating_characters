@@ -479,7 +479,7 @@ function MyLine({ color, ...props }) {
         }}
       >
         <planeGeometry />
-        <meshBasicMaterial color="white" side={DoubleSide} />
+        <meshBasicMaterial color="red" side={DoubleSide} />
       </mesh>
       {refLineGeometries.current.map((g, index) => {
         return (

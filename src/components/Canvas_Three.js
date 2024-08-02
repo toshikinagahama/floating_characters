@@ -313,7 +313,6 @@ function MyLine({ color, ...props }) {
       <mesh
         position={[0, 0, -0.01]}
         scale={[200, 200, 1]}
-        castShadow
         receiveShadow
         onPointerDown={(e) => {
           setIsMouseDown(true);

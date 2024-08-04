@@ -6,7 +6,9 @@ import { OrbitControls, useHelper, PointLightHelper } from "@react-three/drei";
 import { useControls } from "leva";
 
 function MyLine({ color, ...props }) {
-  const size = 20; //大きさ
+  const SIZE = 20; //メッシュのサイズ/2
+  const NUM = 10; //メッシュの1辺の頂点数
+  const DT = 0.005; //積分時間
   const ref = useRef();
   const [points, setPoints] = useState([new THREE.Vector3(0, 0, 0)]);
   const [isMouseDown, setIsMouseDown] = useState(false);
@@ -33,169 +35,93 @@ function MyLine({ color, ...props }) {
         if (i == selectedIndex) {
           continue;
         }
-        const a = refRegions.current[keys[i]].a;
-        const b = refRegions.current[keys[i]].b;
-        const c = refRegions.current[keys[i]].c;
-        const d = refRegions.current[keys[i]].d;
-        const a_d = refRegions.current[keys[i]].a_d;
-        const b_d = refRegions.current[keys[i]].b_d;
-        const c_d = refRegions.current[keys[i]].c_d;
-        const d_d = refRegions.current[keys[i]].d_d;
+        const fs = refRegions.current[keys[i]].fs;
+        const mesh_vs = refRegions.current[keys[i]].mesh_vs;
+        const mesh_vs_d = refRegions.current[keys[i]].mesh_vs_d;
+        const mesh_vs_d2 = refRegions.current[keys[i]].mesh_vs_d2;
+        const springIndices = refRegions.current[keys[i]].springIndices;
+        const springLengths = refRegions.current[keys[i]].springLengths;
         //各メッシュの点に物理演算
         // ma = -kx - cv + mg + f1(浮力) + f2(外力)
         // 質量
-        const m_a = 3.2;
-        const m_b = 3.2;
-        const m_c = 3;
-        const m_d = 3;
+        let ms = []; //各頂点の質量
+        let f1s = []; //各頂点の浮力
+        let f2s = []; //各頂点の外力（風）
+        for (let ii = 0; ii < mesh_vs.length; ii++) {
+          ms.push(1);
+          if (ii >= 12) {
+            f1s.push(new THREE.Vector3(0.0, 0.0, 200));
+          } else {
+            f1s.push(new THREE.Vector3(0.0, 0.0, 100));
+          }
+          f2s.push(
+            new THREE.Vector3(
+              (Math.random() - 0.5) * 2000,
+              (Math.random() - 0.5) * 2000,
+              (Math.random() - 0.5) * 30,
+            ),
+          );
+        }
         //減速係数
-        const c_all = 1; //減速係数
+        const c_all = 10; //減速係数
         //バネ係数
-        const k_all = 100; //バネ係数
-        //浮力
-        const f1_a = new THREE.Vector3(0.0, 0.0, 0);
-        const f1_b = new THREE.Vector3(0.0, 0.0, 0);
-        const f1_c = new THREE.Vector3(0.0, 0.0, 100);
-        const f1_d = new THREE.Vector3(0.0, 0.0, 100);
-        //外力
-        const f2_a = new THREE.Vector3(
-          (Math.random() - 0.5) * 200,
-          (Math.random() - 0.5) * 200,
-          (Math.random() - 0.5) * 30,
-        );
-        const f2_b = new THREE.Vector3(
-          (Math.random() - 0.5) * 20,
-          (Math.random() - 0.5) * 20,
-          (Math.random() - 0.5) * 30,
-        );
-        const f2_c = new THREE.Vector3(
-          (Math.random() - 0.5) * 50,
-          (Math.random() - 0.5) * 50,
-          (Math.random() - 0.5) * 30,
-        );
-        const f2_d = new THREE.Vector3(
-          (Math.random() - 0.5) * 70,
-          (Math.random() - 0.5) * 70,
-          (Math.random() - 0.5) * 30,
-        );
-        const gra = new THREE.Vector3(0, 0, -14.0);
-        //aにかかる力, ab, adの張力
-        const l_ab = b
-          .clone()
-          .sub(a)
-          .normalize()
-          .multiplyScalar(b.distanceTo(a) - size);
-        const l_bc = c
-          .clone()
-          .sub(b)
-          .normalize()
-          .multiplyScalar(c.distanceTo(b) - size);
-        const l_cd = d
-          .clone()
-          .sub(c)
-          .normalize()
-          .multiplyScalar(d.distanceTo(c) - size);
-        const l_da = a
-          .clone()
-          .sub(d)
-          .normalize()
-          .multiplyScalar(a.distanceTo(d) - size);
-        //if (l_ab.dot(l_ab) <= size * size) {
-        //  //張力がゼロ
-        //  l_ab.x = 0.0;
-        //  l_ab.y = 0.0;
-        //  l_ab.z = 0.0;
-        //}
-        //if (l_bc.dot(l_bc) <= size * size) {
-        //  //張力がゼロ
-        //  l_bc.x = 0.0;
-        //  l_bc.y = 0.0;
-        //  l_bc.z = 0.0;
-        //}
-        //if (l_cd.dot(l_cd) <= size * size) {
-        //  //張力がゼロ
-        //  l_cd.x = 0.0;
-        //  l_cd.y = 0.0;
-        //  l_cd.z = 0.0;
-        //}
-        //if (l_da.dot(l_da) <= size * size) {
-        //  //張力がゼロ
-        //  l_da.x = 0.0;
-        //  l_da.y = 0.0;
-        //  l_da.z = 0.0;
-        //}
-        const f_a = l_ab
-          .clone()
-          .multiplyScalar(k_all)
-          .add(l_da.clone().multiplyScalar(-k_all)) //逆方向
-          .add(gra.clone().multiplyScalar(m_a))
-          .add(a_d.clone().multiplyScalar(-c_all).add(f1_a).add(f2_a));
-        const f_b = l_ab
-          .clone()
-          .multiplyScalar(-k_all) //逆方向
-          .add(l_bc.clone().multiplyScalar(k_all))
-          .add(gra.clone().multiplyScalar(m_b))
-          .add(b_d.clone().multiplyScalar(-c_all).add(f1_b).add(f2_b));
-        const f_c = l_bc
-          .clone()
-          .multiplyScalar(-k_all) //逆方向
-          .add(l_cd.clone().multiplyScalar(k_all))
-          .add(gra.clone().multiplyScalar(m_c))
-          .add(c_d.clone().multiplyScalar(-c_all).add(f1_c).add(f2_c));
-        const f_d = l_cd
-          .clone()
-          .multiplyScalar(-k_all) //逆方向
-          .add(l_da.clone().multiplyScalar(k_all))
-          .add(gra.clone().multiplyScalar(m_d))
-          .add(d_d.clone().multiplyScalar(-c_all).add(f1_d).add(f2_d));
-        const dt = 0.01;
-        refRegions.current[keys[i]].a_d2 = f_a.clone().multiplyScalar(m_a);
-        refRegions.current[keys[i]].b_d2 = f_b.clone().multiplyScalar(m_b);
-        refRegions.current[keys[i]].c_d2 = f_c.clone().multiplyScalar(m_c);
-        refRegions.current[keys[i]].d_d2 = f_d.clone().multiplyScalar(m_d);
-        refRegions.current[keys[i]].a_d.add(
-          refRegions.current[keys[i]].a_d2.clone().multiplyScalar(dt),
-        );
-        refRegions.current[keys[i]].b_d.add(
-          refRegions.current[keys[i]].b_d2.clone().multiplyScalar(dt),
-        );
-        refRegions.current[keys[i]].c_d.add(
-          refRegions.current[keys[i]].c_d2.clone().multiplyScalar(dt),
-        );
-        refRegions.current[keys[i]].d_d.add(
-          refRegions.current[keys[i]].d_d2.clone().multiplyScalar(dt),
-        );
-        refRegions.current[keys[i]].a.add(
-          refRegions.current[keys[i]].a_d.clone().multiplyScalar(dt),
-        );
-        refRegions.current[keys[i]].b.add(
-          refRegions.current[keys[i]].b_d.clone().multiplyScalar(dt),
-        );
-        refRegions.current[keys[i]].c.add(
-          refRegions.current[keys[i]].c_d.clone().multiplyScalar(dt),
-        );
-        refRegions.current[keys[i]].d.add(
-          refRegions.current[keys[i]].d_d.clone().multiplyScalar(dt),
-        );
-        if (refRegions.current[keys[i]].a.z < 0) {
-          refRegions.current[keys[i]].a.z = 0;
-          refRegions.current[keys[i]].a_d.z = 0;
-          refRegions.current[keys[i]].a_d2.z = 0;
-        }
-        if (refRegions.current[keys[i]].b.z < 0) {
-          refRegions.current[keys[i]].b.z = 0;
-          refRegions.current[keys[i]].b_d.z = 0;
-          refRegions.current[keys[i]].b_d2.z = 0;
-        }
-        if (refRegions.current[keys[i]].c.z < 0) {
-          refRegions.current[keys[i]].c.z = 0;
-          refRegions.current[keys[i]].c_d.z = 0;
-          refRegions.current[keys[i]].c_d2.z = 0;
-        }
-        if (refRegions.current[keys[i]].d.z < 0) {
-          refRegions.current[keys[i]].d.z = 0;
-          refRegions.current[keys[i]].d_d.z = 0;
-          refRegions.current[keys[i]].d_d2.z = 0;
+        const k_all = 300; //バネ係数
+        const gra = new THREE.Vector3(0, 0, -4.0);
+        for (let ii = 0; ii < mesh_vs.length; ii++) {
+          //各頂点の加速度を運動方程式から導く
+          let f = new THREE.Vector3(0, 0, 0);
+          f.add(gra.clone().multiplyScalar(ms[ii])); //重力
+          f.add(mesh_vs_d[ii].clone().multiplyScalar(-c_all)); //減衰力
+          f.add(f1s[ii]); //浮力
+          f.add(f2s[ii]); //外力
+          f.add(
+            new THREE.Vector3(
+              0,
+              refRegions.current[keys[i]].mesh_vs[ii].z * 5,
+              0,
+            ),
+          ); //徐々にy軸正方向へ
+
+          ////文字をベリッと剥がしたいけどうまくいかない
+          if (refRegions.current[keys[i]].mesh_vs[15].z < 5) {
+            if (ii == 0) {
+              //
+              //console.log(refRegions.current[keys[i]].mesh_vs[0].z);
+              f.add(new THREE.Vector3(0, 0, -1000));
+              //console.log(f);
+            }
+          }
+
+          for (let iii = 0; iii < springIndices[ii].length; iii++) {
+            //バネ力
+            const l = mesh_vs[springIndices[ii][iii]]
+              .clone()
+              .sub(mesh_vs[ii])
+              .normalize()
+              .multiplyScalar(
+                mesh_vs[ii].distanceTo(mesh_vs[springIndices[ii][iii]]) -
+                  springLengths[ii][iii],
+              );
+            f.add(l.clone().multiplyScalar(k_all));
+          }
+          refRegions.current[keys[i]].mesh_vs_d2[ii] = f
+            .clone()
+            .multiplyScalar(1.0 / ms[ii]);
+          refRegions.current[keys[i]].mesh_vs_d[ii].add(
+            refRegions.current[keys[i]].mesh_vs_d2[ii]
+              .clone()
+              .multiplyScalar(DT),
+          );
+          refRegions.current[keys[i]].mesh_vs[ii].add(
+            refRegions.current[keys[i]].mesh_vs_d[ii]
+              .clone()
+              .multiplyScalar(DT),
+          );
+          //if (refRegions.current[keys[i]].mesh_vs[ii].z < -0.1) {
+          //  refRegions.current[keys[i]].mesh_vs[ii].z = 0;
+          //  refRegions.current[keys[i]].mesh_vs_d[ii].z = 0;
+          //  refRegions.current[keys[i]].mesh_vs_d2[ii].z = 0;
+          //}
         }
       }
       for (let i = 0; i < refLineGeometries.current.length; i++) {
@@ -216,13 +142,15 @@ function MyLine({ color, ...props }) {
         }
         if (refLineRegions.current[i] != null) {
           const key = refLineRegions.current[i][0].key;
-          const a = refRegions.current[key].a;
-          const b = refRegions.current[key].b;
-          const c = refRegions.current[key].c;
-          const d = refRegions.current[key].d;
-          const o = refRegions.current[key].o;
+          const fs = refRegions.current[key].fs;
+          const mesh_vs = refRegions.current[key].mesh_vs;
           for (let ii = 0; ii < vertices.length; ii++) {
             if (refLineRegions.current[i][ii] == null) continue;
+            const targetIndex = refLineRegions.current[i][ii].targetIndex;
+            const a = mesh_vs[fs[targetIndex][0]];
+            const b = mesh_vs[fs[targetIndex][1]];
+            const c = mesh_vs[fs[targetIndex][2]];
+            const d = mesh_vs[fs[targetIndex][3]];
             const s = refLineRegions.current[i][ii].s;
             const t = refLineRegions.current[i][ii].t;
             const oNew = new THREE.Vector3(
@@ -241,22 +169,22 @@ function MyLine({ color, ...props }) {
               0.25 *
                 ((1.0 - s) * (1.0 - t) * oa.x +
                   (1.0 + s) * (1.0 - t) * ob.x +
-                  (1.0 + s) * (1.0 + t) * oc.x +
-                  (1.0 - s) * (1.0 + t) * od.x);
+                  (1.0 + s) * (1.0 + t) * od.x +
+                  (1.0 - s) * (1.0 + t) * oc.x);
             vertices[ii].y =
               oNew.y +
               0.25 *
                 ((1.0 - s) * (1.0 - t) * oa.y +
                   (1.0 + s) * (1.0 - t) * ob.y +
-                  (1.0 + s) * (1.0 + t) * oc.y +
-                  (1.0 - s) * (1.0 + t) * od.y);
+                  (1.0 + s) * (1.0 + t) * od.y +
+                  (1.0 - s) * (1.0 + t) * oc.y);
             vertices[ii].z =
               oNew.z +
               0.25 *
                 ((1.0 - s) * (1.0 - t) * oa.z +
                   (1.0 + s) * (1.0 - t) * ob.z +
-                  (1.0 + s) * (1.0 + t) * oc.z +
-                  (1.0 - s) * (1.0 + t) * od.z);
+                  (1.0 + s) * (1.0 + t) * od.z +
+                  (1.0 - s) * (1.0 + t) * oc.z);
           }
 
           for (let ii = 0; ii < positions.length; ii++) {
@@ -407,64 +335,193 @@ function MyLine({ color, ...props }) {
               center[ii] /= positions.length / 3;
             }
             //console.log(center);
-            let x_index1 = Math.floor(center[0] / size);
-            let x_index2 = Math.ceil(center[0] / size);
-            let y_index1 = Math.floor(center[1] / size);
-            let y_index2 = Math.ceil(center[1] / size);
+            let x_index1 = Math.floor(center[0] / SIZE);
+            let x_index2 = Math.ceil(center[0] / SIZE);
+            let y_index1 = Math.floor(center[1] / SIZE);
+            let y_index2 = Math.ceil(center[1] / SIZE);
             x_index1 = parseInt(x_index1 + "");
             x_index2 = parseInt(x_index2 + "");
             y_index1 = parseInt(y_index1 + "");
             y_index2 = parseInt(y_index2 + "");
-            //a,b,c,d
-            const a = new THREE.Vector3(x_index1 * size, y_index1 * size, 0);
-            const b = new THREE.Vector3(x_index2 * size, y_index1 * size, 0);
-            const c = new THREE.Vector3(x_index2 * size, y_index2 * size, 0);
-            const d = new THREE.Vector3(x_index1 * size, y_index2 * size, 0);
+            //左端の(x,y) = (x_index1 * SIZE, y_index1 * SIZE)
+            //左下から頂点を生成していく
+            let mesh_vs = [];
+            const OFFSET = new THREE.Vector3(
+              x_index1 * SIZE,
+              y_index1 * SIZE,
+              0,
+            );
+            const DIV = (SIZE * 2) / (NUM - 1);
+            for (let i = 0; i < NUM; i++) {
+              for (let j = 0; j < NUM; j++) {
+                mesh_vs.push(
+                  new THREE.Vector3(
+                    OFFSET.x + j * DIV,
+                    OFFSET.y + i * DIV,
+                    OFFSET.z,
+                  ),
+                );
+              }
+            }
+            console.log(mesh_vs);
+            //face indexを計算
+            let fs = [];
+            for (let i = 0; i < NUM - 1; i++) {
+              for (let j = 0; j < NUM - 1; j++) {
+                const a_i = parseInt(j + 0 + (i + 0) * NUM + "");
+                const b_i = parseInt(j + 1 + (i + 0) * NUM + "");
+                const c_i = parseInt(j + 0 + (i + 1) * NUM + "");
+                const d_i = parseInt(j + 1 + (i + 1) * NUM + "");
+                fs.push([a_i, b_i, c_i, d_i]);
+              }
+            }
+            console.log(fs);
+            //各頂点のバネの対インデックスを算出
+            //
+            let springIndices = [];
+            for (let i = 0; i < mesh_vs.length; i++) {
+              springIndices.push([]);
+            }
+            for (let i = 0; i < springIndices.length; i++) {
+              //
+              for (let j = 0; j < fs.length; j++) {
+                for (let jj = 0; jj < fs[j].length; jj++) {
+                  //各子メッシュのインデックス
+
+                  if (fs[j].indexOf(i) !== -1) {
+                    //各面のインデックスの中に対象インデックスがあったら
+                    if (fs[j][jj] == i) {
+                      //そのバネだったら飛ばす
+                      continue;
+                    } else {
+                      //それ以外のバネで、springIndicesの中に存在しなかったら追加
+                      if (springIndices[i].indexOf(fs[j][jj]) === -1) {
+                        springIndices[i].push(fs[j][jj]);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            //初期バネ長
+            let springLengths = [];
+            for (let i = 0; i < springIndices.length; i++) {
+              springLengths.push([]);
+              const a = mesh_vs[i];
+              for (let ii = 0; ii < springIndices[i].length; ii++) {
+                const b = mesh_vs[springIndices[i][ii]];
+                springLengths[i].push(b.distanceTo(a));
+              }
+            }
+            console.log(springLengths);
+
+            //左下：0、右下：NUM-1、左上：NUM*(NUM-1)、右上：NUM*NUM-1
             const o = new THREE.Vector3(
-              0.25 * (a.x + b.x + c.x + d.x),
-              0.25 * (a.y + b.y + c.y + d.y),
-              0.25 * (a.z + b.z + c.z + d.z),
+              0.25 *
+                (mesh_vs[0].x +
+                  mesh_vs[NUM - 1].x +
+                  mesh_vs[NUM * (NUM - 1)].x +
+                  mesh_vs[NUM * NUM - 1].x),
+              0.25 *
+                (mesh_vs[0].y +
+                  mesh_vs[NUM - 1].y +
+                  mesh_vs[NUM * (NUM - 1)].y +
+                  mesh_vs[NUM * NUM - 1].y),
+              0.25 *
+                (mesh_vs[0].z +
+                  mesh_vs[NUM - 1].z +
+                  mesh_vs[NUM * (NUM - 1)].z +
+                  mesh_vs[NUM * NUM - 1].z),
             );
 
             console.log(x_index1, x_index2, y_index1, y_index2);
-            console.log(a, b, c, d, o);
+            console.log(o);
             const key = `a${x_index1}b${x_index2}c${y_index1}d${y_index2}`;
             console.log(key);
             if (refRegions.current[key] == null) {
+              let mesh_vs_d = []; //速度
+              let mesh_vs_d2 = []; //加速度
+              for (let i = 0; i < mesh_vs.length; i++) {
+                mesh_vs_d.push(new THREE.Vector3(0, 0, 0));
+                mesh_vs_d2.push(new THREE.Vector3(0, 0, 0));
+              }
               refRegions.current[key] = {
-                l: size / 2,
-                a,
-                a_d: new THREE.Vector3(0, 0, 0), //速度
-                a_d2: new THREE.Vector3(0, 0, 0), //加速度
-                b,
-                b_d: new THREE.Vector3(0, 0, 0), //速度
-                b_d2: new THREE.Vector3(0, 0, 0), //加速度
-                c,
-                c_d: new THREE.Vector3(0, 0, 0), //速度
-                c_d2: new THREE.Vector3(0, 0, 0), //加速度
-                d,
-                d_d: new THREE.Vector3(0, 0, 0), //速度
-                d_d2: new THREE.Vector3(0, 0, 0), //加速度
+                fs,
+                mesh_vs,
+                mesh_vs_d,
+                mesh_vs_d2,
+                springIndices,
+                springLengths,
               };
             } else {
+              //すでに定義されている場合は何もしない
             }
-
-            let params = []; //各頂点のs,t
 
             refLineRegions.current.push([]);
             for (let ii = 0; ii < vertices.length; ii++) {
-              //
-              const op = new THREE.Vector3(
-                vertices[ii].x,
-                vertices[ii].y,
-                vertices[ii].z,
-              ).sub(o);
-              const s = op.x / (size / 2);
-              const t = op.y / (size / 2);
-              //console.log(s, t);
-              params.push({ s, t });
+              const p = vertices[ii];
+              let targetIndex = -1;
+              let distances = [];
+              for (let iii = 0; iii < fs.length; iii++) {
+                const a = mesh_vs[fs[iii][0]];
+                const b = mesh_vs[fs[iii][1]];
+                const c = mesh_vs[fs[iii][2]];
+                const d = mesh_vs[fs[iii][3]];
+                const ap = new THREE.Vector3(p.x - a.x, p.y - a.y, 0);
+                const bp = new THREE.Vector3(p.x - b.x, p.y - b.y, 0);
+                const dp = new THREE.Vector3(p.x - d.x, p.y - d.y, 0);
+                const ac = new THREE.Vector3(c.x - a.x, c.y - a.y, 0);
+                const ab = new THREE.Vector3(b.x - a.x, b.y - a.y, 0);
+                const bd = new THREE.Vector3(d.x - b.x, d.y - b.y, 0);
+                const dc = new THREE.Vector3(c.x - d.x, c.y - d.y, 0);
+                const center = new THREE.Vector3(
+                  (b.x + a.x) / 2,
+                  (c.y + a.y) / 2,
+                  0,
+                );
+                distances.push(
+                  Math.sqrt(
+                    (center.x - p.x) * (center.x - p.x) +
+                      (center.y - p.y) * (center.y - p.y),
+                  ),
+                );
+
+                const cross_z1 = ap.x * ac.y - ap.y * ac.x;
+                const cross_z2 = ab.x * ap.y - ab.y * ap.x;
+                const cross_z3 = bd.x * bp.y - bd.y * bp.x;
+                const cross_z4 = dc.x * dp.y - dc.y * dp.x;
+
+                if (
+                  (cross_z1 > 0) &
+                  (cross_z2 > 0) &
+                  (cross_z3 > 0) &
+                  (cross_z4 > 0)
+                )
+                  targetIndex = iii;
+              }
+              if (targetIndex == -1) {
+                //どこにも属さない場合（はみ出た場合）
+                //一番近い面に属する
+                const index = distances.indexOf(Math.min(...distances));
+                targetIndex = index;
+              }
+              const f = fs[targetIndex];
+              //面に対してのs, tを求める
+              const center = new THREE.Vector3(0, 0, 0);
+              for (let iii = 0; iii < 4; iii++) {
+                center.x += mesh_vs[f[iii]].x;
+                center.y += mesh_vs[f[iii]].y;
+                center.z += mesh_vs[f[iii]].z;
+              }
+              center.x = center.x / 4;
+              center.y = center.y / 4;
+              center.z = center.z / 4;
+              //面が-1から1になるように、s,tを計算
+              const s = (p.x - center.x) / (SIZE / (NUM - 1));
+              const t = (p.y - center.y) / (SIZE / (NUM - 1));
               refLineRegions.current[refLineRegions.current.length - 1].push({
-                key,
+                key, //どこのメッシュか
+                targetIndex, //メッシュの何番目の面か
                 s,
                 t,
               });
